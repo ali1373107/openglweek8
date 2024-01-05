@@ -39,11 +39,13 @@ class OpenGLView(ctx:Context, val textureAvailableCallback: (SurfaceTexture) ->U
     val blue = floatArrayOf(0f,0f,1f,1f)
     val yellow = floatArrayOf(1f,1f,0f,1f)
     val green = floatArrayOf(0f,1f,0f,1f)
-    val viewMatrix = GLMatrix()
+    var viewMatrix = GLMatrix()
     val projectionMatrix = GLMatrix()
     val camera = Camera(0f,0f,0f)
     var cameraFeedSurfaceTexure: SurfaceTexture? = null
-
+    // For representing the current orientation matrix that will be changed to the correct version
+    // when a new sensor reading is obtained
+    var orientationMatrix = GLMatrix()
     // setup code to run when the OpenGL view is first created.
     override fun onSurfaceCreated(unused: GL10, config: EGLConfig){
         GLES20.glClearColor(0.0f,0.0f,0.0f,1.0f)
@@ -108,12 +110,13 @@ class OpenGLView(ctx:Context, val textureAvailableCallback: (SurfaceTexture) ->U
         indexfbuf = OpenGLUtils.makeShortBuffer(shortArrayOf(0,1,2, 2,3,0))
        // val indices1 = shortArrayOf(0,1,2,2,3,0)
         indexfbuf1 = OpenGLUtils.makeShortBuffer(shortArrayOf(0,1,2,2,3,0))
+      //  indexfbuf1 = OpenGLUtils.makeShortBuffer(shortArrayOf(0,1,3,3,1,2))
     }
     //actual scene drawing shoild go here
     override fun onDrawFrame(gl: GL10?){
         //clear any previuse setting from previouse frame
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        //GLES20.glDisable(GLES20.GL_DEPTH_TEST)
 
         gpuTexture.select()
         val ref_aVertext2 = gpuTexture.getAttribLocation("aVertex")
@@ -122,7 +125,7 @@ class OpenGLView(ctx:Context, val textureAvailableCallback: (SurfaceTexture) ->U
         //only run code below if buffer is not null
         if (fbuf != null && fbuf1 != null && fbuf2!= null && indexfbuf != null &&indexfbuf1 !=null){
 
-
+            GLES20.glDisable(GLES20.GL_DEPTH_TEST)
             cameraFeedSurfaceTexure?.updateTexImage()
 
 
@@ -133,10 +136,20 @@ class OpenGLView(ctx:Context, val textureAvailableCallback: (SurfaceTexture) ->U
             //viewMatrix.translate(0.0f,0.0f, -2.0f)
             viewMatrix.translate(-camera.position.x,-camera.position.y,-camera.position.z)
 
+            // setting the view matrix to the identity matrix so that it has no effect initially.
+            viewMatrix.setAsIdentityMatrix()
+
+            // Initialise the view matrix to a clone of the orientation matrix
+            viewMatrix = orientationMatrix.clone()
+
+            // Method call to set the view matrix to the correct sensor matrix
+            viewMatrix.correctSensorMatrix()
+
+
             gpu.select()
             val refAttrib = gpu.getAttribLocation("aVertex")
             val refUColour = gpu.getUniformLocation("uColour")
-            Log.d("OpenGLBasic", "uniforms for gpu: $refAttrib $refUColour")
+           // Log.d("OpenGLBasic", "uniforms for gpu: $refAttrib $refUColour")
             val ref_uViewMatrix = gpu.getUniformLocation("uView")
             val ref_uProjMatrix = gpu.getUniformLocation("uProjection")
             gpu.setUniform4FloatArray(refUColour,blue)
@@ -159,7 +172,7 @@ class OpenGLView(ctx:Context, val textureAvailableCallback: (SurfaceTexture) ->U
             gpu2.select()
             val refUProj2 = gpu2.getUniformLocation("uPerspMtx")
             val refUView2 =gpu2.getUniformLocation("uMvMtx")
-            Log.d("OpenGLBasic", "uniforms: $refUProj2 $refUView2")
+           // Log.d("OpenGLBasic", "uniforms: $refUProj2 $refUView2")
             gpu2.sendMatrix(refUProj2 , projectionMatrix)
             gpu2.sendMatrix(refUView2, viewMatrix)
 
